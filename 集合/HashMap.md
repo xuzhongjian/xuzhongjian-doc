@@ -198,33 +198,44 @@ HashMap 是通过hash的方式，来存储 k-v 对的一个对象。简单来说
 ```java
     final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
                    boolean evict) {
+        // tab 是node数组，p是计算出来的那个数组的位置的node，n是数组的长度，i是p的index
         Node<K,V>[] tab; Node<K,V> p; int n, i;
         if ((tab = table) == null || (n = tab.length) == 0)
+            // 如果数组为空，那么新建一个数组。
             n = (tab = resize()).length;
         if ((p = tab[i = (n - 1) & hash]) == null)
+            // 如果计算出来的数组的位置为空，那么直接吧新的值set进去即可。
             tab[i] = newNode(hash, key, value, null);
         else {
+            // 计算出来的位置已经有了值，也就是发生了hash冲突。
             Node<K,V> e; K k;
             if (p.hash == hash &&
                 ((k = p.key) == key || (key != null && key.equals(k))))
+                // p 和插入进来的 key 的 hash 值相同，那么认为 p.key 和 key 是同一个值，那么将 p 覆盖。
                 e = p;
             else if (p instanceof TreeNode)
+                // 如果 p 是一个数的节点，那么认为数组的这个位置已经是一个红黑树了。直接使用树的插入方法插入即可。
                 e = ((TreeNode<K,V>)p).putTreeVal(this, tab, hash, key, value);
             else {
+                // 除了上面两个可能性以外就是链表了。
                 for (int binCount = 0; ; ++binCount) {
+                    // 找到链表的尾节点
                     if ((e = p.next) == null) {
+                        // 并且把新插入的值 set 到尾节点上
                         p.next = newNode(hash, key, value, null);
-                        if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
+                        if (binCount >= TREEIFY_THRESHOLD - 1)
+                            // 如果达到了树化的阈值，进行树化，将这个链表转化成一个红黑树。
                             treeifyBin(tab, hash);
                         break;
                     }
+                    // 如果在遍历链表的过程中，发现了 hash 值相同的，那么判定成是同一个 k，将原来的值覆盖即可。
                     if (e.hash == hash &&
                         ((k = e.key) == key || (key != null && key.equals(k))))
                         break;
                     p = e;
                 }
             }
-            if (e != null) { // existing mapping for key
+            if (e != null) { // 已经存在了，直接覆盖。
                 V oldValue = e.value;
                 if (!onlyIfAbsent || oldValue == null)
                     e.value = value;
@@ -233,6 +244,7 @@ HashMap 是通过hash的方式，来存储 k-v 对的一个对象。简单来说
             }
         }
         ++modCount;
+        // 如果超过 负载因子 * capcity，那么对数组进行扩容。
         if (++size > threshold)
             resize();
         afterNodeInsertion(evict);
