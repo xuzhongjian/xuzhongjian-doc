@@ -6,6 +6,13 @@ HashMap 是通过hash的方式，来存储 k-v 对的一个对象。简单来说
 
 在 Java 1.7 中，HashMap 是由数组和链表组装而成的。而在 Java 1.8 中，在原来的数据结构的基础上，添加了红黑树，结构更加复杂了，但是效率也变高了。
 
+## 基本流程 ##
+
+```mermaid
+graph TD
+    A --> B
+```
+
 ## 几个阈值 ##
 
 ```java
@@ -83,3 +90,58 @@ HashMap 是通过hash的方式，来存储 k-v 对的一个对象。简单来说
      */
     final float loadFactor;
 ```
+
+## 构造方法 ##
+
+### 默认的构造方法 ###
+
+```java
+    /**
+     * 构造一个空的 HashMap，使用默认的容量16，和默认的负载因子0.75。
+     */
+    public HashMap() {
+        this.loadFactor = DEFAULT_LOAD_FACTOR;
+        // all other fields defaulted
+    }
+```
+
+### 指定参数的构造方法 ###
+
+```java
+    /**
+     * 构造一个空的 hashMap ，使用指定的初始容量和负载因子。
+     *
+     * @param  initialCapacity the initial capacity
+     * @param  loadFactor      the load factor
+     * @throws IllegalArgumentException 如果初始容量为负数或者负载因子非正数。
+     */
+    public HashMap(int initialCapacity, float loadFactor) {
+        if (initialCapacity < 0)
+            throw new IllegalArgumentException("Illegal initial capacity: " +
+                                               initialCapacity);
+        if (initialCapacity > MAXIMUM_CAPACITY)
+            initialCapacity = MAXIMUM_CAPACITY;
+        if (loadFactor <= 0 || Float.isNaN(loadFactor))
+            throw new IllegalArgumentException("Illegal load factor: " +
+                                               loadFactor);
+        this.loadFactor = loadFactor;
+        this.threshold = tableSizeFor(initialCapacity);
+    }
+```
+
+```java
+    /**
+     * 返回大于等于cap的最小的2的n次方。
+     */
+    static final int tableSizeFor(int cap) {
+        int n = cap - 1;
+        n |= n >>> 1;
+        n |= n >>> 2;
+        n |= n >>> 4;
+        n |= n >>> 8;
+        n |= n >>> 16;
+        return (n < 0) ? 1 : (n >= MAXIMUM_CAPACITY) ? MAXIMUM_CAPACITY : n + 1;
+    }
+```
+
+##
