@@ -169,13 +169,73 @@ HashMap 是通过hash的方式，来存储 k-v 对的一个对象。简单来说
     }
 ```
 
-主要分为三个步骤：
+主要分为3个步骤：
 
 1. 取对象的 hashCode 方法 = h。
 
 2. 取 h 高位，也就是将 h 的前16高位，移动到后16低位上 = hash。
 
-3. return index = (table.length - 1) & hash;
+3. return h ^ hash;
 
-这样做的目的是保证在 table 的 length 较小时，也能保证hashCode的高位和低位都能参与到运算中。
+这样做的目的是，尽量的让 hashCode 的高位也参与计算。因为计算在 table 中的位置是通过低位来计算的。
 
+### hash & (table.length - 1) ###
+
+```java
+    // ...
+    // int n = tab.length;
+    if ((p = tab[i = (n - 1) & hash]) == null)
+                tab[i] = newNode(hash, key, value, null);
+    // ...
+```
+
+上面计算出来的 hash 值，通过和 table.length 取与操作，可以达到index = hash % (table.length) 的效果。这样可以取得一个范围为 [0 , table.length-1] 的随机数，并将这个随机数作为在数组中的位置。（当然，以这种方式计算的速度要比 % 操作快一些。）
+
+## 插入 ##
+
+插入方法是整个 HashMap 中的核心方法之一。
+
+```java
+    final V putVal(int hash, K key, V value, boolean onlyIfAbsent,
+                   boolean evict) {
+        Node<K,V>[] tab; Node<K,V> p; int n, i;
+        if ((tab = table) == null || (n = tab.length) == 0)
+            n = (tab = resize()).length;
+        if ((p = tab[i = (n - 1) & hash]) == null)
+            tab[i] = newNode(hash, key, value, null);
+        else {
+            Node<K,V> e; K k;
+            if (p.hash == hash &&
+                ((k = p.key) == key || (key != null && key.equals(k))))
+                e = p;
+            else if (p instanceof TreeNode)
+                e = ((TreeNode<K,V>)p).putTreeVal(this, tab, hash, key, value);
+            else {
+                for (int binCount = 0; ; ++binCount) {
+                    if ((e = p.next) == null) {
+                        p.next = newNode(hash, key, value, null);
+                        if (binCount >= TREEIFY_THRESHOLD - 1) // -1 for 1st
+                            treeifyBin(tab, hash);
+                        break;
+                    }
+                    if (e.hash == hash &&
+                        ((k = e.key) == key || (key != null && key.equals(k))))
+                        break;
+                    p = e;
+                }
+            }
+            if (e != null) { // existing mapping for key
+                V oldValue = e.value;
+                if (!onlyIfAbsent || oldValue == null)
+                    e.value = value;
+                afterNodeAccess(e);
+                return oldValue;
+            }
+        }
+        ++modCount;
+        if (++size > threshold)
+            resize();
+        afterNodeInsertion(evict);
+        return null;
+    }
+```
