@@ -6,7 +6,7 @@ HashMap 是通过hash的方式，来存储 k-v 对的一个对象。简单来说
 
 在 Java 1.7 中，HashMap 是由数组和链表组装而成的。而在 Java 1.8 中，在原来的数据结构的基础上，添加了红黑树，结构更加复杂了，但是效率也变高了。
 
-## 数据存储的基本流程 ##
+## 数据插入的基本流程 ##
 
 当尝试着插入一个新的k-v（也就是Map.Entry<K,V>对象）时。
 
@@ -158,4 +158,24 @@ HashMap 是通过hash的方式，来存储 k-v 对的一个对象。简单来说
     }
 ```
 
-##
+## 计算应在数组中的位置 ##
+
+### k.hash ##
+
+```java
+    static final int hash(Object key) {
+        int h;
+        return (key == null) ? 0 : (h = key.hashCode()) ^ (h >>> 16);
+    }
+```
+
+主要分为三个步骤：
+
+1. 取对象的 hashCode 方法 = h。
+
+2. 取 h 高位，也就是将 h 的前16高位，移动到后16低位上 = hash。
+
+3. return index = (table.length - 1) & hash;
+
+这样做的目的是保证在 table 的 length 较小时，也能保证hashCode的高位和低位都能参与到运算中。
+
