@@ -2,6 +2,8 @@
 
 # 测试方式 #
 
+[[TOC]]
+
 ```java
 package com.xuzhongjian;
 
