@@ -1,8 +1,4 @@
-<!-- 参考spring实战第四版 -->
-
 # 测试方式 #
-
-[[TOC]]
 
 ```java
 package com.xuzhongjian;
@@ -29,6 +25,8 @@ public class AopApplication {
     }
 }
 ```
+
+
 
 # Component #
 
@@ -89,7 +87,7 @@ P36-2.3
 
 # Configuration #
 
-使用@Configuration来表示这个类是一个配置类，配置类中包含Spring应用context中创建bean的细节。@Configuration注解可以用Java代码的形式实现Spring中xml配置文件中配置的效果。现在一般都很少使用xml配置的方法来注册bean了。
+使用@Configuration来表示这个类是一个配置类，配置类中包含Spring应用context中创建bean的细节。@Configuration注解可以用Java代码的形式实现Spring中xml配置文件中配置的效果。
 
 ```java
 @Configuration
@@ -116,7 +114,6 @@ public class Config{
 # Autowired #
 
 1. 使用在方法上
-
     ```java
     @Component
     public class A{
@@ -127,13 +124,13 @@ public class Config{
             this.b = b;
         }
         
-        @Autowired
+    	@Autowired
         public void setB(B b){
             this.b = b;
         }
     }
     ```
-
+    
 2. 使用在成员变量上
 
     ```java
@@ -210,7 +207,6 @@ class AaController{
 @Quailfier
 public @interface Cold{}
 ```
-
 ```java
 @Target({ElementType.CONSTRUCTOR,ElementType.METHOD,
          ElementType.FIELD,ElementType.Type})
@@ -250,7 +246,7 @@ public class MagicExistsCondition implements Condition {
 
 ```java
 public interface Condition {
-    boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata);
+	boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata);
 }
 ```
 
@@ -258,20 +254,20 @@ public interface Condition {
 
 ```java
 public interface ConditionContext {
-    BeanDefinitionRegistry getRegistry();
-    ConfigurableListableBeanFactory getBeanFactory();
-    Environment getEnvironment();
-    ResourceLoader getResourceLoader();
-    ClassLoader getClassLoader();
+	BeanDefinitionRegistry getRegistry();
+	ConfigurableListableBeanFactory getBeanFactory();
+	Environment getEnvironment();
+	ResourceLoader getResourceLoader();
+	ClassLoader getClassLoader();
 }
 ```
 
 ```java
 public interface AnnotatedTypeMetadata {
-    boolean isAnnotated(String annotationType);
-    Map<String, Object> getAnnotationAttributes(String annotationType); getAnnotationAttributes(String annotationType, boolean classValuesAsString);
-    MultiValueMap<String, Object> getAllAnnotationAttributes(String annotationType);
-    MultiValueMap<String, Object> getAllAnnotationAttributes(String annotationType, boolean classValuesAsString);
+	boolean isAnnotated(String annotationType);
+	Map<String, Object> getAnnotationAttributes(String annotationType); getAnnotationAttributes(String annotationType, boolean classValuesAsString);
+	MultiValueMap<String, Object> getAllAnnotationAttributes(String annotationType);
+	MultiValueMap<String, Object> getAllAnnotationAttributes(String annotationType, boolean classValuesAsString);
 }
 ```
 
@@ -331,28 +327,28 @@ Spring在确定哪个profile处于激活状态时，需要依赖两个独立的�
 @Documented
 @Conditional(ProfileCondition.class)
 public @interface Profile {
-    String[] value();
+	String[] value();
 }
 ```
 
 ```java
 class ProfileCondition implements Condition {
-    @Override
-    public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
-    if (context.getEnvironment() != null) {
-            MultiValueMap<String, Object> attrs 
+	@Override
+	public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+		if (context.getEnvironment() != null) {
+			MultiValueMap<String, Object> attrs 
                 = metadata.getAllAnnotationAttributes(Profile.class.getName());
-            if (attrs != null) {
-                for (Object value : attrs.get("value")) {
-                    if (context.getEnvironment().acceptsProfiles(((String[]) value))) {
-                        return true;
-                    }
-                }
-                return false;
-            }
-        }
-        return true;
-    }
+			if (attrs != null) {
+				for (Object value : attrs.get("value")) {
+					if (context.getEnvironment().acceptsProfiles(((String[]) value))) {
+						return true;
+					}
+				}
+				return false;
+			}
+		}
+		return true;
+	}
 }
 ```
 
