@@ -98,8 +98,6 @@ e.g.
 + 参数：比如：()代表是没有参数；(..)代表是匹配任意数量、任意类型的参数；(java.lang.String)表示一个String类型的参数；(java.lang.String..)表示任意数量的String类型参数；(*,java.lang.String)第一个是任意类型，第二个是String的参数的方法
 + 异常（可选）：语法："throws 任意异常类型"，可以是多个，用逗号分隔，例如：throws java.lang.IllegalArgumentException, java.lang.ArrayIndexOutOfBoundsException
 
-
-
 ### 注解：获取参数 ###
 
 使用注解对连接点的选择的时候，可以附带额外的参数，对于不同的参数进行不同的advice操作。
@@ -126,15 +124,15 @@ import java.lang.reflect.Method;
 public class AnnotationAspect {
     @Around("@annotation(com.xuzhongjian.aop.annotation.AnnotationAnnotation)")
     public Object aroundPjp(ProceedingJoinPoint pjp) throws Throwable {
-        MethodSignature signature = (MethodSignature) pjp.getSignature();	// #1
-        Method method = signature.getMethod();								// #2
+        MethodSignature signature = (MethodSignature) pjp.getSignature();// #1
+        Method method = signature.getMethod();// #2
         AnnotationAnnotation thisAnnotation 
-            = method.getAnnotation(AnnotationAnnotation.class);	// #3
-        int value = thisAnnotation.value();			// #4
+            = method.getAnnotation(AnnotationAnnotation.class);// #3
+        int value = thisAnnotation.value();// #4
         String param1 = thisAnnotation.param1();
         String param2 = thisAnnotation.param2();
         String param3 = thisAnnotation.param3();
-        log.info(value + " " + param1 + " " + param2 + " " + param3);	// #5
+        log.info(value + " " + param1 + " " + param2 + " " + param3);// #5
         return pjp.proceed();
     }
 }
@@ -147,4 +145,3 @@ public class AnnotationAspect {
 5. 得到每个字段对应的值之后，进行不同的操作
 
 ***注解的参数只能从@Around方式传入的ProceedingJoinPoint对象中才能获取到***
-

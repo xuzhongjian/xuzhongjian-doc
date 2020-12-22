@@ -327,28 +327,28 @@ Spring在确定哪个profile处于激活状态时，需要依赖两个独立的�
 @Documented
 @Conditional(ProfileCondition.class)
 public @interface Profile {
-	String[] value();
+    String[] value();
 }
 ```
 
 ```java
 class ProfileCondition implements Condition {
-	@Override
-	public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
-		if (context.getEnvironment() != null) {
-			MultiValueMap<String, Object> attrs 
+    @Override
+    public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
+        if (context.getEnvironment() != null) {
+            MultiValueMap<String, Object> attrs 
                 = metadata.getAllAnnotationAttributes(Profile.class.getName());
-			if (attrs != null) {
-				for (Object value : attrs.get("value")) {
-					if (context.getEnvironment().acceptsProfiles(((String[]) value))) {
-						return true;
-					}
-				}
-				return false;
-			}
-		}
-		return true;
-	}
+            if (attrs != null) {
+                for (Object value : attrs.get("value")) {
+                    if (context.getEnvironment().acceptsProfiles(((String[]) value))) {
+                        return true;
+                    }
+                }
+                return false;
+            }
+        }
+        return true;
+    }
 }
 ```
 
