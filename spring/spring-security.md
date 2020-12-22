@@ -1,6 +1,6 @@
 # Spring Security #
 
-基于Spring的DI和AOP的特性，Spring Security能提供对Spring服务的安全保护。 
+基于Spring的DI和AOP的特性，Spring Security能提供对Spring服务的安全保护。
 
 ## 配置 ##
 
@@ -98,25 +98,23 @@ package org.springframework.security.crypto.password;
 
 public interface PasswordEncoder {
 
-	/**
-	 * 对原始密码进行编码。通常，一个良好的编码算法使用 SHA-1 算法或优秀的八位hash算法或优秀的椒盐噪声算法。
-	 */
-	String encode(CharSequence rawPassword);
+    /**
+     * 对原始密码进行编码。通常，一个良好的编码算法使用 SHA-1 算法或优秀的八位hash算法或优秀的椒盐噪声算法。
+     */
+    String encode(CharSequence rawPassword);
 
-	/**
-	 * 从存储中获取的编码过的密码，对提交的原始密码进行编码，将这两个密码进行匹配。
-	 * 如果密码匹配，则返回true；否则，返回false。
-	 * 这个过程中，存储的密码本身永远不会被解码。
-	 * 
-	 * @param rawPassword 输入的原始密码
-	 * @param encodedPassword 加密之后的真实密码
-	 * @return 将rawPassword加密之后，和encodedPassword进行匹配，返回T/F
-	 */
-	boolean matches(CharSequence rawPassword, String encodedPassword);
+    /**
+     * 从存储中获取的编码过的密码，对提交的原始密码进行编码，将这两个密码进行匹配。
+     * 如果密码匹配，则返回true；否则，返回false。
+     * 这个过程中，存储的密码本身永远不会被解码。
+     * 
+     * @param rawPassword 输入的原始密码
+     * @param encodedPassword 加密之后的真实密码
+     * @return 将rawPassword加密之后，和encodedPassword进行匹配，返回T/F
+     */
+    boolean matches(CharSequence rawPassword, String encodedPassword);
 }
 ```
-
-
 
 ### 数据库表的用户认证 ###
 
@@ -212,7 +210,7 @@ public class BeanConfig {
 
 但是更加简单的方法是：引入的 spring-boot-starter-jdbc 和 mysql-connector-java 的依赖，然后在application.yaml文件中配置 spring.datasource 相关的值，那么Springboot会自动自动的配置 datasource 的 bean，然后在 set 方法上面的@Autowired 可以直接引入这个bean。
 
-```
+```yaml
 # DataSource Config
 spring:
   datasource:
@@ -226,21 +224,21 @@ spring:
 设置用来查询刚才设定好的数据库中的用户的用户名和id的sql语句：
 
 ```java
-	/**
-	 * 设置用来查询用户的用户名和密码的sql语句，比如：
-	 * 
-	 * <code>
-	 *     select username,password,enabled from users where username = ?
-	 * </code>
-	 * @param 用于选择用户名、密码以及'是否通过用户名启用用户'的查询。用户名必须包含一个参数。
-	 * @return 一个用于查询用户相关的信息的配置类
-	 * @throws Exception 抛出异常
-	 */
-	public JdbcUserDetailsManagerConfigurer<B> usersByUsernameQuery(String query)
-			throws Exception {
-		getUserDetailsService().setUsersByUsernameQuery(query);
-		return this;
-	}
+    /**
+     * 设置用来查询用户的用户名和密码的sql语句，比如：
+     * 
+     * <code>
+     *     select username,password,enabled from users where username = ?
+     * </code>
+     * @param 用于选择用户名、密码以及'是否通过用户名启用用户'的查询。用户名必须包含一个参数。
+     * @return 一个用于查询用户相关的信息的配置类
+     * @throws Exception 抛出异常
+     */
+    public JdbcUserDetailsManagerConfigurer<B> usersByUsernameQuery(String query)
+        throws Exception {
+        getUserDetailsService().setUsersByUsernameQuery(query);
+        return this;
+    }
 ```
 
 从示例sql
@@ -256,28 +254,28 @@ select username,password,enabled from users where username = ?
 同样的，使用authoritiesByUsernameQuery方法来设置用户对应的权限：
 
 ```java
-	/**
-	 * 设置用于通过用户名查找用户权限的sql语句。比如:
-	 *
-	 * <code>
-	 *     select username,authority from authorities where username = ?
-	 * </code>
-	 *
-	 * @param query 用于选择用户名（按用户名授权）的查询。
-	 * @return 一个用于查询用户权限相关的信息的配置类
-	 * @throws Exception 抛出异常
-	 */
-	public JdbcUserDetailsManagerConfigurer<B> authoritiesByUsernameQuery(String query)
-			throws Exception {
-		getUserDetailsService().setAuthoritiesByUsernameQuery(query);
-		return this;
-	}
+    /**
+     * 设置用于通过用户名查找用户权限的sql语句。比如:
+     *
+     * <code>
+     *     select username,authority from authorities where username = ?
+     * </code>
+     *
+     * @param query 用于选择用户名（按用户名授权）的查询。
+     * @return 一个用于查询用户权限相关的信息的配置类
+     * @throws Exception 抛出异常
+     */
+    public JdbcUserDetailsManagerConfigurer<B> authoritiesByUsernameQuery(String query)
+    throws Exception {
+                getUserDetailsService().setAuthoritiesByUsernameQuery(query);
+        return this;
+    }
 ```
 
 从
 
 ```sql
-	select username,authority from authorities where username = ?
+    select username,authority from authorities where username = ?
 ```
 
 可以发现需要返回的字段有username和authority，同上，我们自己定义的权限表和sql语句也应该包含username和authority两个字段。
@@ -289,16 +287,16 @@ select username,password,enabled from users where username = ?
 默认的拦截配置：
 
 ```java
-	protected void configure(HttpSecurity http) throws Exception {
-		logger.debug("Using default configure(HttpSecurity). If subclassed this will potentially override subclass configure(HttpSecurity).");
+    protected void configure(HttpSecurity http) throws Exception {
+        logger.debug("Using default configure(HttpSecurity). If subclassed this will potentially override subclass configure(HttpSecurity).");
 
-		http
-			.authorizeRequests()
-				.anyRequest().authenticated() // 所有请求都需要进行登陆授权
-				.and()
-			.formLogin().and()	// 表单登陆
-			.httpBasic();
-	}
+        http
+            .authorizeRequests()
+                .anyRequest().authenticated() // 所有请求都需要进行登陆授权
+                .and()
+                .formLogin().and()// 表单登陆
+            .httpBasic();
+    }
 ```
 
 对每个请求进行细粒度安全性控制的关键在于重载 configure(HttpSecurity) 方法，而这个 configure 方法还有很多相关的方法：

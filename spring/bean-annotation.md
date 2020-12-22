@@ -1,4 +1,6 @@
-# 测试方式 #
+# bean #
+
+## 测试方式 ##
 
 ```java
 package com.xuzhongjian;
@@ -26,9 +28,7 @@ public class AopApplication {
 }
 ```
 
-
-
-# Component #
+## Component ##
 
 P36-2.2
 
@@ -48,7 +48,7 @@ public class City {
 
 @Component注解默认是不开启的，需要使用@ComponentScan注解Spring寻找@Component的类，并为其创建bean。
 
-# Named #
+## Named ##
 
 @Named是Java提供的依赖注入的规范中的一个注解。可以使用@Named注解指定bean的名字，Spring支持@Named注解作为@Component注解的替代方案。
 
@@ -58,7 +58,7 @@ public class City {
 }
 ```
 
-# ComponentScan #
+## ComponentScan ##
 
 P36-2.3
 
@@ -85,7 +85,7 @@ P36-2.3
 
 最好的方式是在需要被标记成组件类的包中，定义一个用来标记的空接口（marked interface）。这样能做到业务代码和配置的解耦。
 
-# Configuration #
+## Configuration ##
 
 使用@Configuration来表示这个类是一个配置类，配置类中包含Spring应用context中创建bean的细节。@Configuration注解可以用Java代码的形式实现Spring中xml配置文件中配置的效果。
 
@@ -95,7 +95,7 @@ public class JavaConfig {
 }
 ```
 
-# Bean #
+## Bean ##
 
 P45
 
@@ -111,9 +111,10 @@ public class Config{
 }
 ```
 
-# Autowired #
+## Autowired ##
 
 1. 使用在方法上
+
     ```java
     @Component
     public class A{
@@ -124,13 +125,13 @@ public class Config{
             this.b = b;
         }
         
-    	@Autowired
+        @Autowired
         public void setB(B b){
             this.b = b;
         }
     }
     ```
-    
+
 2. 使用在成员变量上
 
     ```java
@@ -143,11 +144,11 @@ public class Config{
 
 @Autowired表示由Spring传入一个在类型上符合的bean。可以使用在方法上，也可以使用在成员变量上。
 
-# Inject #
+## Inject ##
 
 Inject 和 Named 都是Java的依赖注入的规范，Spring支持使用这两个注解来对bean进行注入。大多数场景下，@Inject和@Autowired作用相同，可以相互替代使用。
 
-# Primary #
+## Primary ##
 
 当一个类存在多个符合条件的bean，然后需要对这个类进行注入的时候。Spring会由于无法选择，抛出NoUniqueBeanDefinitionException。在这种场景下，可以使用@Primary注解来设置首选的bean。
 
@@ -171,7 +172,7 @@ public class JavaConfig{
 }
 ```
 
-# Qualifier #
+## Qualifier ##
 
 P79
 
@@ -207,6 +208,7 @@ class AaController{
 @Quailfier
 public @interface Cold{}
 ```
+
 ```java
 @Target({ElementType.CONSTRUCTOR,ElementType.METHOD,
          ElementType.FIELD,ElementType.Type})
@@ -217,7 +219,7 @@ public @interface Creamy{}
 
 通过上面的方法就能实现两个配置就能同时使用两个@Quailfier注解。
 
-# Conditional #
+## Conditional ##
 
 Spring4引入了一个新的注解：Conditional。
 
@@ -246,7 +248,7 @@ public class MagicExistsCondition implements Condition {
 
 ```java
 public interface Condition {
-	boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata);
+    boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata);
 }
 ```
 
@@ -254,26 +256,26 @@ public interface Condition {
 
 ```java
 public interface ConditionContext {
-	BeanDefinitionRegistry getRegistry();
-	ConfigurableListableBeanFactory getBeanFactory();
-	Environment getEnvironment();
-	ResourceLoader getResourceLoader();
-	ClassLoader getClassLoader();
+    BeanDefinitionRegistry getRegistry();
+    ConfigurableListableBeanFactory getBeanFactory();
+    Environment getEnvironment();
+    ResourceLoader getResourceLoader();
+    ClassLoader getClassLoader();
 }
 ```
 
 ```java
 public interface AnnotatedTypeMetadata {
-	boolean isAnnotated(String annotationType);
-	Map<String, Object> getAnnotationAttributes(String annotationType); getAnnotationAttributes(String annotationType, boolean classValuesAsString);
-	MultiValueMap<String, Object> getAllAnnotationAttributes(String annotationType);
-	MultiValueMap<String, Object> getAllAnnotationAttributes(String annotationType, boolean classValuesAsString);
+    boolean isAnnotated(String annotationType);
+    Map<String, Object> getAnnotationAttributes(String annotationType); getAnnotationAttributes(String annotationType, boolean classValuesAsString);
+    MultiValueMap<String, Object> getAllAnnotationAttributes(String annotationType);
+    MultiValueMap<String, Object> getAllAnnotationAttributes(String annotationType, boolean classValuesAsString);
 }
 ```
 
 通过传入的这两个对象，可以获取这个环境、上下文、注解的相关的信息，然后自定义返回一个boolean，告知Spring是否需要注册这个bean。
 
-# Profile #
+## Profile ##
 
 Spring引入了profile 的功能。使用profile可以指定由@Configuration修饰的配置类属于的环境，也可以在配置类中指定@Bean对应的环境。
 
@@ -352,7 +354,7 @@ class ProfileCondition implements Condition {
 }
 ```
 
-# Scope #
+## Scope ##
 
 在默认情况写，Spring context中的作用域默认为单例。也就是说，在默认情况下，无论一个bean注入其他的bean多少次，使用的都是同一个实例对象。
 
