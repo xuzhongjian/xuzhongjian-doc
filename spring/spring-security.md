@@ -397,7 +397,7 @@ access方法，将SpEL表达式扩展开，使用SpEL的风格来描述安全相
                 .anyRequest().permitAll()
                 .and()
                 .requiresChannel()
-                .antMatchers(HttpMethod.GET, "/*/test").requiresSecure();	// 强制使用HTTPS请求
+                .antMatchers(HttpMethod.GET, "/*/test").requiresSecure();// 强制使用HTTPS请求
     }
 ```
 
@@ -429,14 +429,3 @@ Spring-Security实现CSRF跨域的方法是在发送请求的时候，在表单�
         http.csrf().disable();
     }
 ```
-
-
-
-
-
-
-
-
-
-
-
