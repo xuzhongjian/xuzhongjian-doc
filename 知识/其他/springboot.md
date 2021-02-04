@@ -42,7 +42,7 @@ public @interface SpringBootApplication {
 
 @SpringBootApplication 这个注解中:
 
-1. @SpringBootConfiguration 
+1. @SpringBootConfiguration
    这个注解就是把Spring原生的 @Configuration 进行了一次封装，继承了 @Configuration 注解配置类的能力，所以使用 @SpringBootApplication 和 @SpringBootApplication 修饰的类，都可以作为Spring的配置类使用。也就是Springboot的启动类，也可以作为bean的配置类使用。
 
 2. @EnableAutoConfiguration
