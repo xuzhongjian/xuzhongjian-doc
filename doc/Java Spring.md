@@ -969,6 +969,12 @@ Spring-Security实现CSRF跨域的方法是在发送请求的时候，在表单�
 
 ## springboot自动装配原理 ##
 
+SpringBoot启动的时候通过@EnableAutoConfiguration注解找到META-INF/spring.factories文件中的所有自动配置类，并对其加载，这些自动配置类都是以AutoConfiguration结尾来命名的。它们实际上就是Java Config形式的IOC容器配置类，通过以Properties结尾命名的类中取得在全局配置文件中配置的属性，如server.port。
+
+*Properties类的含义：封装配置文件的相关属性。
+
+*AutoConfiguration类的含义：自动配置类，添加到IOC容器中。
+
 ```java
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -1316,7 +1322,6 @@ public ConfigurableApplicationContext run(String... args) {
 
 ```java
     // org.springframework.boot.SpringApplication#refreshContext
-
     private void refreshContext(ConfigurableApplicationContext context) {
         refresh(context);
         if (this.registerShutdownHook) {
@@ -1330,14 +1335,12 @@ public ConfigurableApplicationContext run(String... args) {
     }
 
     // org.springframework.boot.SpringApplication#refresh
-
     protected void refresh(ApplicationContext applicationContext) {
         Assert.isInstanceOf(AbstractApplicationContext.class, applicationContext);
         ((AbstractApplicationContext) applicationContext).refresh();
     }
 
     // org.springframework.context.support.AbstractApplicationContext#refresh
-
     @Override
     public void refresh() throws BeansException, IllegalStateException {
         synchronized (this.startupShutdownMonitor) {
@@ -1427,8 +1430,11 @@ public ConfigurableApplicationContext run(String... args) {
 ## SpringApplication的run方法做了什么？ ##
 
 1. 创建一个 StopWatch 并执行 start 方法，这个类主要记录任务的执行时间
+
 2. 配置 Headless 属性，Headless 模式是在缺少显示屏、键盘或者鼠标时候的系统配置
-3. 在文件 META-INF\spring.factories 中获取 SpringApplicationRunListener 接口的实现类 EventPublishingRunListener ，主要发布springboot应用的事件，用来定义监听器的时间点：
+
+3. 在文件 META-INF\spring.factories 中获取 SpringApplicationRunListener 接口的实现类 EventPublishingRunListener ，来监听springboot应用的事件。用来定义监听器的时间点：
+   ```
    - org.springframework.boot.SpringApplicationRunListeners
    - 1、starting 在一切准备就绪，准备启动时。
    - 2、environmentPrepared 在prepareEnvironment方法内部调用。
@@ -1437,16 +1443,56 @@ public ConfigurableApplicationContext run(String... args) {
    - 5、started 在所有执行完成，ApplicationRunner和CommandLineRunner回调之前。
    - 6、running 在run方法最后单独使用try catch执行，只要上面没有异常，项目已经启动完成。那么running回调异常也不能影响正常流程。
    - 7、failed 在handleRunFailure异常处理中被调用。
+   ```
+
 4. 监听器调用 starting 方法
+
 5. 把输入参数转成 DefaultApplicationArguments 类
+
 6. 创建Environment并设置比如环境信息，系统熟悉，输入参数和profile信息
+
 7. 打印Banner信息
+
 8. 创建Application的上下文，根据WebApplicationTyp来创建Context类，如果非web项目则创建AnnotationConfigApplicationContext，在构造方法中初始化AnnotatedBeanDefinitionReader和ClassPathBeanDefinitionScanner
+
 9. 在文件META-INF\spring.factories中获取SpringBootExceptionReporter接口的实现类FailureAnalyzers
+
 10. 准备application的上下文
     - 初始化ApplicationContextInitializer
     - 执行Initializer的contextPrepared方法，发布ApplicationContextInitializedEvent事件
     - 如果延迟加载，在上下文添加处理器LazyInitializationBeanFactoryPostProcessor
     - 执行加载方法，BeanDefinitionLoader.load方法，主要初始化了AnnotatedGenericBeanDefinition
     - 执行Initializer的contextLoaded方法，发布ApplicationContextInitializedEvent事件
+    
 11. 刷新上下文，在这里真正加载bean到容器中。如果是web容器，会在onRefresh方法中创建一个Server并启动。
+
+## --- ##
+
+1. 寻找META_INF/spring.factories 里面的ApplicationInitializer和ApplicationListener类。
+2. 创建监听器
+3. 启动监听器
+4. 创建上下文
+5. 准备上下文
+6. 刷新上下文
+
+# 三级缓存 #
+
+如果使用单例的bean，使用三级缓存解决循环引用的问题：
+
+| 缓存     | 作用                                                         |
+| -------- | ------------------------------------------------------------ |
+| 一级缓存 | 第一级缓存，存放可用的完全初始化，成品的Bean。               |
+| 二级缓存 | 第二级缓存，存放半成品的Bean，半成品的Bean是已创建对象，但是未注入属性和初始化。用以解决循环依赖。 |
+| 三级缓存 | 第三级缓存，存的是Bean工厂对象，用来生成半成品的Bean并放入到二级缓存中。用以解决循环依赖。如果Bean存在AOP的话，返回的是AOP的代理对象。 |
+
+1. A创建过程中需要B，于是A将放到三级缓存，先去实例化B。
+
+2. B实例化的时候发现需要A，于是B先查一级缓存，没有，再查二级缓存，没有，再查三级缓存，找到了A。
+3. 然后把三级缓存里面的A放到二级缓存里面，并删除三级缓存里面的A。
+
+3. B顺利初始化完毕，放到一级缓存里面。（此时A还未创建完，B已经创建结束。）
+4. 然后接着回来创建A，直接从一级缓存里面拿到B，然后完成创建，并将A放到一级缓存里面。
+
+使用三级缓存的作用是，解决多次aop的问题：
+
+​	单例下，如果是存在aop切面的bean，多次getBean，会存在多次代理aop对象的问题。使用多一集缓存，解决多次AOP的问题。
