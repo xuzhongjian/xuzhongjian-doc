@@ -169,7 +169,7 @@ typedef struct dictEntry{
 
 ## 分布式锁 ##
 
-#### setnx ####
+### setnx ###
 
 下面是一个分布式锁的demo：
 
@@ -235,11 +235,11 @@ public class Solution {
 }
 ```
 
-#### redisson ####
+### redisson ###
 
-##### lua脚本 #####
+#### 加锁 ####
 
-
+**lua脚本**
 
 ```java
 		// 没有加锁，直接加锁
@@ -254,13 +254,166 @@ public class Solution {
             redis.pexpire(key, timeout);
             return null;
         }
-		// 互斥，返回当前持有锁的线程的过期时间
+		// 如果互斥，返回当前持有锁的线程的过期时间
         return redis.pttl(key);
+```
+
+```java
+	@Override
+    public boolean tryLock(long waitTime, long leaseTime, TimeUnit unit) throws InterruptedException {
+        long time = unit.toMillis(waitTime);
+        long current = System.currentTimeMillis();
+        long threadId = Thread.currentThread().getId();
+        // 1.尝试获取锁
+        Long ttl = tryAcquire(leaseTime, unit, threadId);
+        // lock acquired
+        if (ttl == null) {
+            return true;
+        }
+
+        // 申请锁的耗时如果大于等于最大等待时间，则申请锁失败.
+        time -= System.currentTimeMillis() - current;
+        if (time <= 0) {
+            acquireFailed(threadId);
+            return false;
+        }
+
+        current = System.currentTimeMillis();
+
+        /**
+         * 2.订阅锁释放事件，并通过 await 方法阻塞等待锁释放，有效的解决了无效的锁申请浪费资源的问题：
+         * 基于信息量，当锁被其它资源占用时，当前线程通过 Redis 的 channel 订阅锁的释放事件，一旦锁释放会发消息通知待等待的线程进行竞争.
+         *
+         * 当 this.await 返回 false，说明等待时间已经超出获取锁最大等待时间，取消订阅并返回获取锁失败.
+         * 当 this.await 返回 true，进入循环尝试获取锁.
+         */
+        RFuture<RedissonLockEntry> subscribeFuture = subscribe(threadId);
+        // await 方法内部是用 CountDownLatch 来实现阻塞，获取 subscribe 异步执行的结果（应用了 Netty 的 Future）
+        if (!subscribeFuture.await(time, TimeUnit.MILLISECONDS)) {
+            if (!subscribeFuture.cancel(false)) {
+                subscribeFuture.onComplete((res, e) -> {
+                    if (e == null) {
+                        unsubscribe(subscribeFuture, threadId);
+                    }
+                });
+            }
+            acquireFailed(threadId);
+            return false;
+        }
+
+        try {
+            // 计算获取锁的总耗时，如果大于等于最大等待时间，则获取锁失败.
+            time -= System.currentTimeMillis() - current;
+            if (time <= 0) {
+                acquireFailed(threadId);
+                return false;
+            }
+
+            /**
+             * 3.收到锁释放的信号后，在最大等待时间之内，循环一次接着一次的尝试获取锁
+             * 获取锁成功，则立马返回 true，
+             * 若在最大等待时间之内还没获取到锁，则认为获取锁失败，返回 false 结束循环
+             */
+            while (true) {
+                long currentTime = System.currentTimeMillis();
+
+                // 再次尝试获取锁
+                ttl = tryAcquire(leaseTime, unit, threadId);
+                // lock acquired
+                if (ttl == null) {
+                    return true;
+                }
+                // 超过最大等待时间则返回 false 结束循环，获取锁失败
+                time -= System.currentTimeMillis() - currentTime;
+                if (time <= 0) {
+                    acquireFailed(threadId);
+                    return false;
+                }
+
+                /**
+                 * 6.阻塞等待锁（通过信号量(共享锁)阻塞,等待解锁消息）：
+                 */
+                currentTime = System.currentTimeMillis();
+                // ！！！ 下面的信号量怎么获得呢？释放锁，当前的锁被释放，就会产生信号量
+                if (ttl >= 0 && ttl < time) {
+                    //如果剩余时间(ttl)小于wait time ,就在 ttl 时间内，从Entry的信号量获取一个许可(除非被中断或者一直没有可用的许可)。
+                    getEntry(threadId).getLatch().tryAcquire(ttl, TimeUnit.MILLISECONDS);
+                } else {
+                    //则就在wait time 时间范围内等待可以通过信号量
+                    getEntry(threadId).getLatch().tryAcquire(time, TimeUnit.MILLISECONDS);
+                }
+
+                // 更新剩余的等待时间(最大等待时间-已经消耗的阻塞时间)
+                time -= System.currentTimeMillis() - currentTime;
+                if (time <= 0) {
+                    acquireFailed(threadId);
+                    return false;
+                }
+            }
+        } finally {
+            // 7.无论是否获得锁,都要取消订阅解锁消息
+            unsubscribe(subscribeFuture, threadId);
+        }
+        // return get(tryLockAsync(waitTime, leaseTime, unit));
+    }
+```
+
+流程分析：
+
+1. 尝试使用lua脚本获取锁，如果返回null，那么说明加锁成功。如果返回一个数值，那么说明加锁失败，这个数值是当前的持有这个锁的线程的剩余时间。
+2. 如果获取锁失败，那么使用当前这个客户端的 clientId 来订阅锁的释放事件。一旦发现锁释放，就会通知线程开启线程竞争。超过了等待时间，锁没有被释放，那么获得锁失败。
+3. 如果释放了，就会循环尝试获取锁。通过redis的订阅和发布 + 信号量等待解锁的消息。在循环等待的过程中，一旦等待的时间超过了获取锁的timeout，那么获取锁失败。
+
+#### 看门狗 ####
+
+客户端加锁的默认生存的时间是30s，如果超过了30s，客户端需要继续持有这把锁。需要使用到看门狗这个机制：
+
+一旦获取锁成功，就会开启一个续期的看门狗机制。
+
+看门狗机制其实就是一个后台定时任务线程，获取锁成功之后，会将持有锁的线程放入到一个redis更新过期时间的map，里面，然后每隔 10 秒检查一下，还持有锁 key（判断客户端是否还持有 key，其实就是遍历 map 里面线程 id 然后根据线程 id 去 Redis 中查，如果存在就会延长 key 的时间），那么就会不断的延长锁 key 的生存时间。
+
+#### 解锁 ####
+
+| 参数    | 示例值                                 | 含义                          |
+| ------- | -------------------------------------- | ----------------------------- |
+| KEYS[1] | my_lock_name                           | 锁名                          |
+| KEYS[2] | redisson_lock__channel:{my_lock_name}  | **解锁消息PubSub频道**        |
+| ARGV[1] | 0                                      | **redisson定义0表示解锁消息** |
+| ARGV[2] | 30000                                  | 设置锁的过期时间；默认值30秒  |
+| ARGV[3] | 58c62432-bb74-4d14-8a00-9908cc8b828f:1 | 唯一标识；同加锁流程          |
+
+```lua
+
+-- 若锁不存在：则直接广播解锁消息，并返回1
+if (redis.call('exists', KEYS[1]) == 0) then
+    redis.call('publish', KEYS[2], ARGV[1]);
+    return 1; 
+end;
+ 
+-- 若锁存在，但唯一标识不匹配：则表明锁被其他线程占用，当前线程不允许解锁其他线程持有的锁
+if (redis.call('hexists', KEYS[1], ARGV[3]) == 0) then
+    return nil;
+end; 
+ 
+-- 若锁存在，且唯一标识匹配：则先将锁重入计数减1
+local counter = redis.call('hincrby', KEYS[1], ARGV[3], -1); 
+if (counter > 0) then 
+    -- 锁重入计数减1后还大于0：表明当前线程持有的锁还有重入，不能进行锁删除操作，但可以帮忙更新过期时间
+    redis.call('pexpire', KEYS[1], ARGV[2]); 
+    return 0; 
+else 
+    -- 锁重入计数已为0：间接表明锁已释放了。直接删除掉锁，并广播解锁消息，去唤醒那些争抢过锁但还处于阻塞中的线程
+    redis.call('del', KEYS[1]); 
+    redis.call('publish', KEYS[2], ARGV[1]); 
+    return 1;
+end;
+ 
+return nil;
 ```
 
 
 
-##### Redlock思路 #####
+#### Redlock思路 ####
 
 1. 在Redis的分布式环境中，我们假设有N个Redis master。这些节点完全互相独立，不存在主从复制或者其他集群协调机制。
 2. 我们确保将在N个实例上使用与在Redis单实例下相同方法获取和释放锁。现在我们假设有5个Redis master节点，同时我们需要在5台服务器上面运行这些Redis实例，这样保证他们不会同时都宕掉。
@@ -275,29 +428,89 @@ public class Solution {
    + 如果取到了锁，key的真正有效时间等于有效时间减去获取锁所使用的时间(步骤3计算的结果)。
      如果因为某些原因获取锁失败，客户端应该在所有的Redis实例上进行解锁。（即便某些Redis实例根本就没有加锁成功，防止某些节点获取到锁但是客户端没有得到响应而导致接下来的一段时间不能被重新获取锁。）
 
-##### 可重入 #####
+#### 可重入 ####
 
-理清Redisson可重入锁的思路:
+用的 hash 参数
 
-1. 获取锁
-2. 如果获取锁失败，订阅解锁事件
-3. 之后是一个无限循环
+key - client  --> 1（2、3、4）
+
+**在上面的 lua 加锁，解锁脚本中均有体现。**
+
+## 缓存 ##
+
+正常情况下，请求到达服务器，此处的服务器为 tomcat。然后，服务器需要获取数据，如果存在redis缓存，那么先去redis缓存中取得数据，如果redis中没有需要的数据，就再去DB获取。DB一般为速度较慢的硬盘存储。
+
+<img src="https://mmbiz.qpic.cn/mmbiz_png/UtWdDgynLdbdd7ZwluGGtr02DobnuuAvibVFqeED38QV0Pn4tIFMicAm6Xn9sWyCDUYl4kqwp2dO6fYo3IFkgkEA/640?tp=webp&wxfrom=5&wx_lazy=1&wx_co=1" alt="Image" style="zoom:80%;" />
+
+### 缓存穿透 ###
+
+### 缓存击穿 ###
+
+### 缓存雪崩 ###
+
+## Hash环  ##
+
+参考 https://blog.csdn.net/kevinxxw/article/details/105908101
+
+### 使用hash ###
+
+#### 思路 ####
+
+在多个主库的时候，可以使用下面的方式来获得master服务器的位置：
 
 ```java
-while(true) {
-  // 尝试获取锁
-
-  // 判断是否超时
-
-  // 等待解锁消息释放信号量 
-  //（此时每个Java客户端都可能会有多个线程被挂起，但是只有一个线程会被唤醒）
-
-  // 判断是否超时
-}
+        int hash = hash(key);
+        int masterIndex = hash % MASTER_SIZE;
 ```
 
+这样提高了性能。在master服务器的数量不变的时候，可以快速的找到这个key对应的数据库位于的服务器的位置。
 
+#### 问题 ####
 
-## Hash环 ##
+当master扩容，或者master需要摘掉的时候，MASTER_SIZE的大小将改变。造成原有的key对应的masterIndex改变：
 
-https://blog.csdn.net/kevinxxw/article/details/105908101
+```java
+		hash % (MASTER_SIZE + 1) != hash % MASTER_SIZE
+```
+
+这样就会导致在一瞬间所有的缓存都失效，造成缓存雪崩。
+
+### 一致性hash ###
+
+#### 思路 ####
+
+从对key取模，变成了对master服务器取模。对 2<sup>32 </sup>取模，所以取出来的index的位置可以的范围是[ 0 , 2<sup>31</sup>-1 ] ，这中间的值刚好是 2<sup>32 </sup> 个取值。相当于是 2<sup>32 </sup> 点，这些点用来放置我们的机器。
+
+如下图所示，从0开始，顺时针自增，直到 2<sup>31</sup>-1 ，一共 2<sup>32 </sup> 个点。
+
+![img](https://imgconvert.csdnimg.cn/aHR0cHM6Ly9waWMxLnpoaW1nLmNvbS84MC92Mi1mZDQ0YWI3MWM4MzRmM2ZlNDU4YTZmNzZmMzk5N2Y5OF83MjB3LmpwZw?x-oss-process=image/format,png)
+
+然后选择对 master redis机器进行hash，将其hash到这个圆上。（可以使用机器的 ip 来进行 hash ）
+
+<img src="https://imgconvert.csdnimg.cn/aHR0cHM6Ly9waWMxLnpoaW1nLmNvbS84MC92Mi01MDk5OTNhNDlkNDQ3YjM3ODI3M2U0NTVhMDk1ZGUzY183MjB3LmpwZw?x-oss-process=image/format,png" alt="img" style="zoom:67%;" />
+
+如果机器的 ip 出来的结果是均匀的，那么应该是均匀分布在这个圆上面的。
+
+当有数据插入的时候，对数据的 key 进行 hash，然后他们会落在这个圆上的某个位置，将他们沿着这个圆顺时针移动，然后遇到的第一个 master 就是这个 key 对应的 master 节点。
+
+<img src="https://imgconvert.csdnimg.cn/aHR0cHM6Ly9waWM0LnpoaW1nLmNvbS84MC92Mi00ZmFiNjA3MzVkZmFlMGJmNTExNzA5ZTlkMzM3Nzg5Yl83MjB3LmpwZw?x-oss-process=image/format,png" alt="img" style="zoom:67%;" />
+
+#### 容错性 ####
+
+如果 master nodeC 死机了，被摘下了。然后受影响只有 nodeB 顺时针到 nodeC 之间的这些数据，这些数据会被重定向到 nodeD。只会影响一小部分数据，其他的并不会受影响。
+
+<img src="https://imgconvert.csdnimg.cn/aHR0cHM6Ly9waWMxLnpoaW1nLmNvbS84MC92Mi00ZWJjYjhjMjNiYjY0YTYwODk2YmRlODdkZDU0NjIxNF83MjB3LmpwZw?x-oss-process=image/format,png" alt="img" style="zoom:67%;" />
+
+#### 可扩展性 ####
+
+如果需要在 nodeB 顺时针到 nodeC 之间插入一台新的机器 nodeX，那么受影响的只是 nodeB 顺时针到 nodeX 之间的数据，他们会被重定向到 nodeX上。同样也只会影响一部分数据，其他的数据不会收到影响。
+
+<img src="https://imgconvert.csdnimg.cn/aHR0cHM6Ly9waWMyLnpoaW1nLmNvbS84MC92Mi05Y2RiMWFkYzM3ZWIxYTU0YzExNDIzMjEyMGRhMTQ4NV83MjB3LmpwZw?x-oss-process=image/format,png" alt="img" style="zoom:67%;" />
+
+#### 数据倾斜 ####
+
+hash环会存在的问题是，master 机器在环上分布不均匀。下图，80%以上的数据会被定位到 nodeA 上，而 nodeB 只有不到 20% 的数据。 
+
+<img src="https://imgconvert.csdnimg.cn/aHR0cHM6Ly9waWMzLnpoaW1nLmNvbS84MC92Mi0wMzY4ODQxZTUwMjBkZDA3ZjFlNjdmNDQ5YjQ5YTFiYV83MjB3LmpwZw?x-oss-process=image/format,png" alt="img" style="zoom:60%;" />
+
+出现这个问题的解决方案是，对于数据量较少的节点，可以构虚拟节点，将其放置到环上，这样可以尽量做到节点所对应的数据量做到均衡。
