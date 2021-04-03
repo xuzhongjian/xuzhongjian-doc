@@ -438,15 +438,42 @@ key - client  --> 1（2、3、4）
 
 ## 缓存 ##
 
-正常情况下，请求到达服务器，此处的服务器为 tomcat。然后，服务器需要获取数据，如果存在redis缓存，那么先去redis缓存中取得数据，如果redis中没有需要的数据，就再去DB获取。DB一般为速度较慢的硬盘存储。
+正常情况下，请求到达服务器，然后，服务器需要获取数据，如果存在redis缓存，那么先去redis缓存中取得数据，如果redis中没有需要的数据，就再去DB（DB一般为速度较慢的硬盘存储）获取。
 
-<img src="https://mmbiz.qpic.cn/mmbiz_png/UtWdDgynLdbdd7ZwluGGtr02DobnuuAvibVFqeED38QV0Pn4tIFMicAm6Xn9sWyCDUYl4kqwp2dO6fYo3IFkgkEA/640?tp=webp&wxfrom=5&wx_lazy=1&wx_co=1" alt="Image" style="zoom:80%;" />
+![img](https://img-blog.csdn.net/20180919143214712?watermark/2/text/aHR0cHM6Ly9ibG9nLmNzZG4ubmV0L2tvbmd0aWFvNQ==/font/5a6L5L2T/fontsize/400/fill/I0JBQkFCMA==/dissolve/70)
 
 ### 缓存穿透 ###
 
+所需要的数据在数据库中不存在，所以在缓存中也不存在。
+
+然后这样的请求每次到达，都需要访问一次数据库和一次缓存。进行了两次无效的查询，而且查数据库，效率也低，对服务器也造成了压力。
+
+解决办法：
+
+1. 使用布隆过滤器，将数据的 key 存储在一个足够大的bitmap中，用 index - bit 来存储这个数据是否存在在数据库中。这样就拦截了对数据库无效的查询。
+2. 对查询的空数据进行缓存，将其 value 设置成空，这样下次同样的查询到达之后，就不会去查数据库。
+
 ### 缓存击穿 ###
 
+指的是一个缓存 key 非常的热点，一直有大量的数据在对这个key进行大量的访问。这个key在失效的瞬间，大量的请求打到 DB 上，然后 DB 压力过大甚至死机。
+
+解决方法：
+
+1. 互斥锁
+
+   从缓存中获取不到数据。加上互斥锁，从数据库中查询，然后将数据写到缓存中，最后解开互斥锁。
+
+2. 热点数据永不过期
+
 ### 缓存雪崩 ###
+
+大量缓存在同一时刻到期，然后数据请求到达缓存后，没有缓存，然查询DB，造成DB压力过大。
+
+解决方法：
+
+1. 过期时间避免设置在同一时刻过期
+2. 分布式缓存，将缓存放置到不同的节点中
+3. 热点数据永不过期
 
 ## Hash环  ##
 
