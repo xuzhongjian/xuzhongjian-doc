@@ -908,7 +908,7 @@ executorService.submit(() -> System.out.println("hello world!"));
 ### 问题一：什么是Java的内存模型，Java中各个线程是怎么彼此看到对方的变量的？
 ### 问题二：请谈谈volatile有什么特点，为什么它能保证变量对所有线程的可见性？
 
-JMM，共有内存和
+JMM，共有内存。
 
 ### 问题三：既然volatile能够保证线程间的变量可见性，是不是就意味着基于volatile变量的运算就是并 发安全的 ？
 

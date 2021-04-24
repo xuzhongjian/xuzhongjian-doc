@@ -969,6 +969,31 @@ Spring-Security实现CSRF跨域的方法是在发送请求的时候，在表单�
 
 ## springboot自动装配原理 ##
 
+
+
+```txt
+1.通过各种注解实现了类与类之间的依赖关系，容器在启动的时候Application.run，
+会调用EnableAutoConfigurationImportSelector.class的selectImports方法（其实是其父类的方法）
+--这里需要注意，调用这个方法之前发生了什么和是在哪里调用这个方法需要进一步的探讨
+
+2.selectImports方法最终会调用SpringFactoriesLoader.loadFactoryNames方法来获取一个全面的
+常用BeanConfiguration列表
+
+3.loadFactoryNames方法会读取FACTORIES_RESOURCE_LOCATION
+（也就是spring-boot-autoconfigure.jar 下面的META-INF/spring.factories），
+获取到所有的Spring相关的Bean的全限定名ClassName，大概120多个
+
+4.selectImports方法继续调用filter(configurations, autoConfigurationMetadata);
+这个时候会根据这些BeanConfiguration里面的条件，来一一筛选，最关键的是
+@ConditionalOnClass，这个条件注解会去classpath下查找，jar包里面是否有这个条件依赖类，
+所以必须有了相应的jar包，才有这些依赖类，才会生成IOC环境需要的一些默认配置Bean
+
+5.最后把符合条件的BeanConfiguration注入默认的EnableConfigurationPropertie类里面的属性值，
+并且注入到IOC环境当中
+```
+
+
+
 SpringBoot启动的时候通过@EnableAutoConfiguration注解找到META-INF/spring.factories文件中的所有自动配置类，并对其加载，这些自动配置类都是以AutoConfiguration结尾来命名的。它们实际上就是Java Config形式的IOC容器配置类，通过以Properties结尾命名的类中取得在全局配置文件中配置的属性，如server.port。
 
 *Properties类的含义：封装配置文件的相关属性。
@@ -1052,7 +1077,6 @@ public @interface SpringBootConfiguration {
 @Inherited
 @Import(AutoConfigurationPackages.Registrar.class)
 public @interface AutoConfigurationPackage {
-
 }
 ```
 
@@ -1489,10 +1513,9 @@ public ConfigurableApplicationContext run(String... args) {
 
 2. B实例化的时候发现需要A，于是B先查一级缓存，没有，再查二级缓存，没有，再查三级缓存，找到了A。
 3. 然后把三级缓存里面的A放到二级缓存里面，并删除三级缓存里面的A。
-
-3. B顺利初始化完毕，放到一级缓存里面。（此时A还未创建完，B已经创建结束。）
-4. 然后接着回来创建A，直接从一级缓存里面拿到B，然后完成创建，并将A放到一级缓存里面。
+4. B顺利初始化完毕，放到一级缓存里面。（此时A还未创建完，B已经创建结束。）
+5. 然后接着回来创建A，直接从一级缓存里面拿到B，然后完成创建，并将A放到一级缓存里面。
 
 使用三级缓存的作用是，解决多次aop的问题：
 
-​	单例下，如果是存在aop切面的bean，多次getBean，会存在多次代理aop对象的问题。使用多一集缓存，解决多次AOP的问题。
+​	单例下，如果是存在aop切面的bean，多次getBean，会存在多次代理aop对象的问题。使用多一级缓存，解决多次AOP的问题。
