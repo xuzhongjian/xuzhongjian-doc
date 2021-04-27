@@ -540,3 +540,18 @@ hash环会存在的问题是，master 机器在环上分布不均匀。下图，
 <img src="https://imgconvert.csdnimg.cn/aHR0cHM6Ly9waWMzLnpoaW1nLmNvbS84MC92Mi0wMzY4ODQxZTUwMjBkZDA3ZjFlNjdmNDQ5YjQ5YTFiYV83MjB3LmpwZw?x-oss-process=image/format,png" alt="img" style="zoom:60%;" />
 
 出现这个问题的解决方案是，对于数据量较少的节点，可以构虚拟节点，将其放置到环上，这样可以尽量做到节点所对应的数据量做到均衡。
+
+
+
+## 限流 ##
+
+使用 redis zset数据结构，zset默认升序
+
+key:			ip_192.168.0.1_token
+value:		1619528271511
+socre:		1619528271511
+
+1. curTs
+2. 使用[ZCOUNT key (curTs-1000) curTs]获取当前最近1秒钟以内打入系统的请求数量 = ipCount
+3. 使用[ZREMRANGEBYSCORE key 0 (curTs-1000)]删除一分钟之前的ip的记录
+4. if(ipCount > 阈值) 拒绝请求
